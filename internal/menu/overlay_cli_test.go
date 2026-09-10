@@ -39,6 +39,7 @@ func initGitDir(t *testing.T, dir string) {
 
 func writeOverlayFile(t *testing.T, dir string, payload map[string]any) (string, []byte) {
 	t.Helper()
+	t.Setenv(config.EnvNoOverlay, "")
 	path := filepath.Join(dir, config.OverlayFilename)
 	data, err := json.Marshal(payload)
 	if err != nil {

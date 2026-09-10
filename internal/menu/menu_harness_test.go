@@ -19,12 +19,20 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/dualface/kander/internal/config"
 )
 
 var testKander string
 var repoRoot string
 
 func TestMain(m *testing.M) {
+	// Keep each fixture's own scope configuration authoritative: without this the
+	// lookup reaches the project overlay of the checkout the tests run in, here
+	// and in the kander processes these tests start.
+	if err := os.Setenv(config.EnvNoOverlay, "1"); err != nil {
+		os.Exit(1)
+	}
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		os.Exit(1)

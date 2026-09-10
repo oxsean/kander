@@ -11,6 +11,7 @@ import (
 
 func tempOverlaySession(t *testing.T, mode config.Mode) (*Session, string) {
 	t.Helper()
+	t.Setenv(config.EnvNoOverlay, "")
 	t.Setenv(config.EnvConfig, filepath.Join(t.TempDir(), "config.json"))
 	cfg := config.DefaultConfig()
 	cfg.WelcomeComplete = true
@@ -303,6 +304,7 @@ func TestSetTargetRollsBackWhenOverlayInvalid(t *testing.T) {
 
 func gitOffOverlaySession(t *testing.T) (*Session, string) {
 	t.Helper()
+	t.Setenv(config.EnvNoOverlay, "")
 	t.Setenv(config.EnvConfig, filepath.Join(t.TempDir(), "config.json"))
 	cfg := config.DefaultConfig()
 	cfg.WelcomeComplete = true
