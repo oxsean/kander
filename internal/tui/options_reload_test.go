@@ -133,6 +133,7 @@ func TestOpenOptionsDiscardsUnsavedEditsOnReopen(t *testing.T) {
 }
 
 func TestOpenOptionsKeepsOverlayOutOfScopeSave(t *testing.T) {
+	t.Setenv(config.EnvNoOverlay, "")
 	dir := t.TempDir()
 	_, original := writeTempOverlay(t, dir, map[string]any{
 		"kanban_agent": "claude",
@@ -287,6 +288,7 @@ func TestOpenOptionsFormUsesScopeTUINotApp(t *testing.T) {
 }
 
 func TestOpenOptionsFormIgnoresOverlayTUI(t *testing.T) {
+	t.Setenv(config.EnvNoOverlay, "")
 	dir := t.TempDir()
 	t.Chdir(dir)
 	writeTempOverlay(t, dir, map[string]any{"tui": map[string]any{"theme": "dark", "columns": 2}})
@@ -425,6 +427,7 @@ func TestOpenOptionsBindsCapturedScopeLanguage(t *testing.T) {
 }
 
 func TestOpenOptionsIgnoresOverlayLanguageBeforeWelcome(t *testing.T) {
+	t.Setenv(config.EnvNoOverlay, "")
 	config.ApplyLanguageArgument(nil)
 	t.Setenv(config.EnvLangCLI, "")
 	t.Setenv(config.EnvLang, "en_US.UTF-8")
@@ -448,6 +451,7 @@ func TestOpenOptionsIgnoresOverlayLanguageBeforeWelcome(t *testing.T) {
 }
 
 func TestOpenOptionsAcceptsLegacyRulesOverlay(t *testing.T) {
+	t.Setenv(config.EnvNoOverlay, "")
 	app := newPanelApp(t)
 	_ = newTestSession(t)
 	useTestOptionsSession(t)

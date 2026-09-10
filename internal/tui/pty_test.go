@@ -190,6 +190,7 @@ func isolatedHome(t *testing.T) (home string, env []string) {
 		"KANDER_CONFIG=" + filepath.Join(home, ".config", "kander", "config.json"),
 		"KANDER_LANG=en",
 		"KANDER_SKIP_INSTALL=1",
+		config.EnvNoOverlay + "=1",
 	}
 	return home, env
 }
@@ -309,6 +310,8 @@ func TestOptionsProjectTabsAndNarrowPathsOnPTY(t *testing.T) {
 	writeCompleteConfig(t, env)
 	configPath := configPathFromEnv(t, env)
 	overlay := filepath.Join(project, config.OverlayFilename)
+	// This test is about the project tab itself, so it needs the real lookup.
+	env = append(env, config.EnvNoOverlay+"=")
 	session := startPTYAt(t, project, bin, env)
 	if !session.waitFor("Task Board", 8*time.Second) {
 		t.Fatalf("board did not render\npty:\n%s", session.text())

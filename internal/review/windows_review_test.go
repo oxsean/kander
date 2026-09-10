@@ -10,9 +10,15 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dualface/kander/internal/config"
 )
 
 func TestMain(m *testing.M) {
+	// Same isolation as the POSIX TestMain: fixtures keep their own scope config.
+	if err := os.Setenv(config.EnvNoOverlay, "1"); err != nil {
+		panic(err)
+	}
 	if len(os.Args) >= 3 && os.Args[1] == "review" && os.Args[2] == windowsJobBootstrap {
 		os.Exit(windowsJobBootstrapMain(os.Args[3:]))
 	}
