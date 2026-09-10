@@ -298,6 +298,11 @@ func syncPlanBatchTarget(tx *Transaction, b ReviewBatch) (ReviewPlan, error) {
 			continue
 		}
 		if pb.TargetCommit != b.TargetCommit {
+			// Rewriting the copies must not double as an undeclared repair: a
+			// damaged tracker or member copy stays a reportable error.
+			if err = verifyPlanCopiesFor(tx, p, false); err != nil {
+				return p, err
+			}
 			previous := p
 			p.Batches = slices.Clone(p.Batches)
 			p.Batches[i].TargetCommit = b.TargetCommit

@@ -63,7 +63,9 @@ func ExtendReviewPlan(root string, x ReviewPlanExtension) error {
 			if e != nil {
 				return e
 			}
-			if s.Entry.State != "working" && s.Entry.State != "review" && (len(x.RebindCycles) == 0 || p.Cycles[id] != planCycle(s)) {
+			// A pure target sync repairs a record the old advance left behind, so it
+			// must still reach a plan whose members already completed.
+			if s.Entry.State != "working" && s.Entry.State != "review" && !x.SyncTargets && (len(x.RebindCycles) == 0 || p.Cycles[id] != planCycle(s)) {
 				return reviewError("plan member is terminal")
 			}
 			if p.Cycles[id] != planCycle(s) {
