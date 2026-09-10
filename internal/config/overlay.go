@@ -156,6 +156,11 @@ func walkOverlay(start string) (string, error) {
 // OverlayPath returns the absolute project overlay path for cwd, or "" when none exists.
 // A Git directory uses the main worktree root; otherwise the search walks up from cwd.
 func OverlayPath(cwd string) (string, error) {
+	// Fixtures run from inside a checkout, where the lookup would otherwise reach
+	// the developer's own overlay and merge it into the fixture's scope config.
+	if os.Getenv(EnvNoOverlay) != "" {
+		return "", nil
+	}
 	if cwd == "" {
 		var err error
 		cwd, err = os.Getwd()

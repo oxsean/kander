@@ -17,6 +17,7 @@ const (
 	ProjectInstallDirname    = ".kander"
 	ProjectGitExcludePattern = "/.kander/"
 	EnvConfig                = "KANDER_CONFIG"
+	EnvNoOverlay             = "KANDER_NO_OVERLAY"
 	EnvLang                  = "KANDER_LANG"
 	EnvLangCLI               = "KANDER_LANG_CLI"
 )

@@ -45,6 +45,7 @@ func TestOpenOptionsReloadsScopeFromDisk(t *testing.T) {
 }
 
 func TestOpenOptionsReloadsOverlayNoticeAndLanguage(t *testing.T) {
+	t.Setenv(config.EnvNoOverlay, "")
 	config.ApplyLanguageArgument(nil)
 	t.Setenv(config.EnvLangCLI, "")
 	t.Setenv(config.EnvLang, "en_US.UTF-8")
@@ -167,6 +168,7 @@ func TestOpenOptionsKeepsOverlayOutOfScopeSave(t *testing.T) {
 }
 
 func TestOpenOptionsLoadErrorsClearSession(t *testing.T) {
+	t.Setenv(config.EnvNoOverlay, "")
 	t.Run("scope", func(t *testing.T) {
 		app := newPanelApp(t)
 		stale := newTestSession(t)
@@ -342,6 +344,7 @@ func TestOpenOptionsBindsExplicitLanguageNotSchemaDefault(t *testing.T) {
 }
 
 func TestOpenOptionsInvalidOverlayLanguageIsLoadError(t *testing.T) {
+	t.Setenv(config.EnvNoOverlay, "")
 	dir := t.TempDir()
 	t.Chdir(dir)
 	writeTempOverlay(t, dir, map[string]any{"language": "invalid"})
@@ -360,6 +363,7 @@ func TestOpenOptionsInvalidOverlayLanguageIsLoadError(t *testing.T) {
 }
 
 func TestOpenOptionsBindsCapturedOverlayLanguage(t *testing.T) {
+	t.Setenv(config.EnvNoOverlay, "")
 	config.ApplyLanguageArgument(nil)
 	t.Setenv(config.EnvLangCLI, "")
 	t.Setenv(config.EnvLang, "en_US.UTF-8")
@@ -472,6 +476,7 @@ func TestOpenOptionsAcceptsLegacyRulesOverlay(t *testing.T) {
 }
 
 func TestOpenOptionsRefreshesThemeLabelsAfterLanguageReload(t *testing.T) {
+	t.Setenv(config.EnvNoOverlay, "")
 	config.ApplyLanguageArgument(nil)
 	t.Setenv(config.EnvLangCLI, "")
 	t.Setenv(config.EnvLang, "en_US.UTF-8")

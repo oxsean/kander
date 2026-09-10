@@ -88,6 +88,7 @@ func TestDeepMergeObjectsScalarsAndArrays(t *testing.T) {
 }
 
 func TestOverlayPathGitAndNonGitLookup(t *testing.T) {
+	overlayLookup(t)
 	setupHome(t)
 	root := t.TempDir()
 	main := initGitRepo(t, filepath.Join(root, "repo"))
@@ -160,6 +161,7 @@ func TestOverlayPathGitAndNonGitLookup(t *testing.T) {
 }
 
 func TestLoadMergesReviewStagesAfterNormalizingFlatScope(t *testing.T) {
+	overlayLookup(t)
 	setupHome(t)
 	root := t.TempDir()
 	main := initGitRepo(t, filepath.Join(root, "repo"))
@@ -189,6 +191,7 @@ func TestLoadMergesReviewStagesAfterNormalizingFlatScope(t *testing.T) {
 }
 
 func TestLoadMergesReviewStagesAfterNormalizingFlatOverlay(t *testing.T) {
+	overlayLookup(t)
 	setupHome(t)
 	root := t.TempDir()
 	main := initGitRepo(t, filepath.Join(root, "repo"))
@@ -220,6 +223,7 @@ func TestLoadMergesReviewStagesAfterNormalizingFlatOverlay(t *testing.T) {
 }
 
 func TestOverlayRejectsForbiddenUnknownInvalidAndUnsafeFiles(t *testing.T) {
+	overlayLookup(t)
 	setupHome(t)
 	root := t.TempDir()
 	main := initGitRepo(t, filepath.Join(root, "repo"))
@@ -282,6 +286,7 @@ func TestOverlayRejectsForbiddenUnknownInvalidAndUnsafeFiles(t *testing.T) {
 }
 
 func TestWritesDoNotCopyOverlayValuesIntoScope(t *testing.T) {
+	overlayLookup(t)
 	setupHome(t)
 	root := t.TempDir()
 	main := initGitRepo(t, filepath.Join(root, "repo"))
@@ -385,6 +390,7 @@ func TestRepairLeavesOverlayBytesAndValuesOutOfScope(t *testing.T) {
 }
 
 func TestConfiguredLanguageUsesOverlay(t *testing.T) {
+	overlayLookup(t)
 	setupHome(t)
 	root := t.TempDir()
 	main := initGitRepo(t, filepath.Join(root, "repo"))
@@ -465,6 +471,7 @@ func TestApplyOverlayMergesLanguageWithoutMutatingScope(t *testing.T) {
 }
 
 func TestFormatConfigLinesIncludesOverlayPath(t *testing.T) {
+	overlayLookup(t)
 	setupHome(t)
 	root := t.TempDir()
 	main := initGitRepo(t, filepath.Join(root, "repo"))
@@ -484,5 +491,39 @@ func TestFormatConfigLinesIncludesOverlayPath(t *testing.T) {
 	joined := strings.Join(lines, "\n")
 	if !strings.Contains(joined, Text("config.overlay_file")+": ") || !strings.Contains(joined, overlay) {
 		t.Fatalf("missing overlay path:\n%s", joined)
+	}
+}
+
+func TestNoOverlayEnvSkipsLookupAndMerge(t *testing.T) {
+	overlayLookup(t)
+	setupHome(t)
+	root := t.TempDir()
+	main := initGitRepo(t, filepath.Join(root, "repo"))
+	overlay := filepath.Join(main, OverlayFilename)
+	writeJSONFile(t, overlay, map[string]any{"kanban_agent": "claude"})
+	writeScopeFile(t, filepath.Join(root, "config.json"))
+	t.Chdir(main)
+
+	got, err := OverlayPath("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertSameRealPath(t, got, overlay)
+
+	t.Setenv(EnvNoOverlay, "1")
+	got, err = OverlayPath("")
+	if err != nil || got != "" {
+		t.Fatalf("lookup still reached the overlay: %q %v", got, err)
+	}
+	cfg, err := Load(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scopeCfg, err := LoadScope(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.KanbanAgent != scopeCfg.KanbanAgent {
+		t.Fatalf("overlay value merged anyway: %s", cfg.KanbanAgent)
 	}
 }

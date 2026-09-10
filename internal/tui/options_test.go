@@ -840,6 +840,7 @@ func writeTempOverlay(t *testing.T, dir string, payload map[string]any) (string,
 }
 
 func TestOptionsPanelShowsOverlayNotice(t *testing.T) {
+	t.Setenv(config.EnvNoOverlay, "")
 	dir := t.TempDir()
 	writeTempOverlay(t, dir, map[string]any{"kanban_agent": "claude"})
 	t.Chdir(dir)
@@ -859,6 +860,7 @@ func TestOptionsPanelShowsOverlayNotice(t *testing.T) {
 }
 
 func TestOptionsSaveLeavesOverlayIsolated(t *testing.T) {
+	t.Setenv(config.EnvNoOverlay, "")
 	dir := t.TempDir()
 	_, original := writeTempOverlay(t, dir, map[string]any{
 		"kanban_agent": "claude",
@@ -904,6 +906,7 @@ func TestOptionsSaveLeavesOverlayIsolated(t *testing.T) {
 }
 
 func TestSaveColumnsLeavesOverlayTUIIsolated(t *testing.T) {
+	t.Setenv(config.EnvNoOverlay, "")
 	dir := t.TempDir()
 	_, original := writeTempOverlay(t, dir, map[string]any{
 		"tui": map[string]any{"theme": "dark", "columns": 6},
