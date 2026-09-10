@@ -255,15 +255,85 @@ func batchPlan(tx *Transaction, b ReviewBatch) (ReviewPlan, error) {
 	if !ok || p.PlanID != b.PlanID {
 		return p, reviewError("batch review plan required")
 	}
+	return p, planBatchBinding(p, b)
+}
+
+// planBatchBinding compares the frozen plan record with the runtime batch. A
+// target difference is reported on its own, because only an advance may move it.
+func planBatchBinding(p ReviewPlan, b ReviewBatch) error {
 	for _, pb := range p.Batches {
-		if pb.BatchID == b.BatchID {
-			if pb.Base != b.Base || !slices.Equal(pb.TaskIDs, b.TaskIDs) || !reflect.DeepEqual(pb.Requirements, b.Requirements) || pb.PreviousBatchID != b.PreviousBatchID || p.ReportLanguage != b.ReportLanguage {
-				return p, reviewError("batch plan binding")
-			}
-			return p, nil
+		if pb.BatchID != b.BatchID {
+			continue
 		}
+		if pb.Base != b.Base || !slices.Equal(pb.TaskIDs, b.TaskIDs) || !reflect.DeepEqual(pb.Requirements, b.Requirements) || pb.PreviousBatchID != b.PreviousBatchID || p.ReportLanguage != b.ReportLanguage {
+			return reviewError("batch plan binding")
+		}
+		if pb.TargetCommit != b.TargetCommit {
+			return planTargetMismatch(b.BatchID, pb.TargetCommit, b.TargetCommit)
+		}
+		return nil
+	}
+	return reviewError("unplanned batch")
+}
+
+// planTargetMismatch names both SHAs so check, move done and review progress all
+// report which batch drifted and which side is current.
+func planTargetMismatch(batchID, planTarget, batchTarget string) error {
+	return reviewError(fmt.Sprintf("batch %s plan target out of sync: plan_target=%s batch_target=%s; sync it with review extend-plan sync_targets", batchID, planTarget, batchTarget))
+}
+
+// syncPlanBatchTarget carries a runtime batch advance into the frozen plan so the
+// last planned target stays the closed final target that wrap-up evidence binds.
+func syncPlanBatchTarget(tx *Transaction, b ReviewBatch) (ReviewPlan, error) {
+	var p ReviewPlan
+	ok, err := readReviewJSON(tx, planName(b.PlanID), &p)
+	if err != nil {
+		return p, err
+	}
+	if !ok || p.PlanID != b.PlanID {
+		return p, reviewError("batch review plan required")
+	}
+	for i, pb := range p.Batches {
+		if pb.BatchID != b.BatchID {
+			continue
+		}
+		if pb.TargetCommit != b.TargetCommit {
+			previous := p
+			p.Batches = slices.Clone(p.Batches)
+			p.Batches[i].TargetCommit = b.TargetCommit
+			p.Revision++
+			if err = putPlanHistory(tx, p, previous, "advance batch "+b.BatchID+" to "+b.TargetCommit); err != nil {
+				return p, err
+			}
+			if err = putPlanCopies(tx, p); err != nil {
+				return p, err
+			}
+		}
+		return p, planBatchBinding(p, b)
 	}
 	return p, reviewError("unplanned batch")
+}
+
+// putPlanCopies rewrites the control record and every member card copy that
+// verifyPlanCopiesFor compares byte for byte.
+func putPlanCopies(tx *Transaction, p ReviewPlan) error {
+	for _, id := range p.TaskIDs {
+		if err := tx.PutGroup(reviewControlGroup, "tracked-cycles/"+id+".json", reviewJSON(map[string]string{"cycle": p.Cycles[id]})); err != nil {
+			return err
+		}
+		if err := tx.Put(id, "reviews/plan.json", reviewJSON(p)); err != nil {
+			return err
+		}
+	}
+	return tx.PutGroup(reviewControlGroup, planName(p.PlanID), reviewJSON(p))
+}
+
+func putPlanHistory(tx *Transaction, p, previous ReviewPlan, request any) error {
+	return tx.PutGroup(reviewControlGroup, fmt.Sprintf("plan-history/%s/%d.json", p.PlanID, p.Revision), reviewJSON(struct {
+		Previous   ReviewPlan `json:"previous"`
+		Request    any        `json:"request"`
+		RecordedAt string     `json:"recorded_at"`
+	}{previous, request, time.Now().UTC().Format(time.RFC3339Nano)}))
 }
 func validatePreviousClosure(tx *Transaction, b ReviewBatch) error {
 	seen := map[string]bool{b.BatchID: true}

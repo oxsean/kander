@@ -244,11 +244,16 @@ func PrepareReviewRun(root string, input ReviewInput, requirements map[string]st
 			return e
 		}
 		if ok && batch.PlanID != "" {
-			p, e := batchPlan(tx, batch)
+			// Read the plan directly: a batch whose plan target is still stale must
+			// reach the write transaction that syncs it, not fail this scope probe.
+			var p ReviewPlan
+			found, e := readReviewJSON(tx, planName(batch.PlanID), &p)
 			if e != nil {
 				return e
 			}
-			scopeIDs = p.TaskIDs
+			if found {
+				scopeIDs = p.TaskIDs
+			}
 		}
 		return nil
 	})
@@ -302,6 +307,7 @@ func PrepareReviewRun(root string, input ReviewInput, requirements map[string]st
 			return nil
 		}
 		var batch ReviewBatch
+		advanced := false
 		exists, e = readReviewJSON(tx, reviewBatchName(input.BatchID), &batch)
 		if e != nil {
 			return e
@@ -343,6 +349,7 @@ func PrepareReviewRun(root string, input ReviewInput, requirements map[string]st
 				batch.Advances = append(batch.Advances, *advance)
 				batch.TargetCommit = input.Commit
 				batch.Revision++
+				advanced = true
 			} else if advance != nil {
 				return reviewError("redundant batch advance")
 			}
@@ -354,9 +361,19 @@ func PrepareReviewRun(root string, input ReviewInput, requirements map[string]st
 			return reviewError("batch already closed")
 		}
 		if batch.PlanID != "" {
-			if p, e := batchPlan(tx, batch); e != nil {
+			// An advance stages the synced plan, whose write this transaction
+			// cannot read back; take the value the sync itself returned.
+			var p ReviewPlan
+			var e error
+			if advanced {
+				p, e = syncPlanBatchTarget(tx, batch)
+			} else {
+				p, e = batchPlan(tx, batch)
+			}
+			if e != nil {
 				return e
-			} else if p.CWD != input.CWD {
+			}
+			if p.CWD != input.CWD {
 				return reviewError("run/plan worktree mismatch")
 			}
 			if e := validatePreviousClosure(tx, batch); e != nil {

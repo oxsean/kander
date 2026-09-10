@@ -1,11 +1,10 @@
 package board
 
 import (
-	"fmt"
 	"maps"
 	"reflect"
+	"slices"
 	"strings"
-	"time"
 )
 
 // ReviewPlanExtension appends one batch after the prior closure, or seals the
@@ -16,16 +15,20 @@ type ReviewPlanExtension struct {
 	ExpectedRevision uint64            `json:"expected_revision"`
 	Batch            *ReviewPlanBatch  `json:"batch,omitempty"`
 	Seal             bool              `json:"seal"`
+	SyncTargets      bool              `json:"sync_targets,omitempty"`
 	Author           string            `json:"author"`
 	Basis            string            `json:"basis"`
 }
 
 func ExtendReviewPlan(root string, x ReviewPlanExtension) error {
-	if !ValidReviewID(x.PlanID) || strings.TrimSpace(x.Author) == "" || strings.TrimSpace(x.Basis) == "" || x.Batch == nil && !x.Seal && len(x.RebindCycles) == 0 {
+	if !ValidReviewID(x.PlanID) || strings.TrimSpace(x.Author) == "" || strings.TrimSpace(x.Basis) == "" || x.Batch == nil && !x.Seal && len(x.RebindCycles) == 0 && !x.SyncTargets {
 		return reviewError("plan extension provenance")
 	}
 	if len(x.RebindCycles) > 0 && (x.Batch != nil || x.Seal) {
 		return reviewError("cycle rebind cannot change batches or sealing")
+	}
+	if x.SyncTargets && (x.Batch != nil || x.Seal || len(x.RebindCycles) > 0) {
+		return reviewError("target sync cannot change batches, sealing or cycles")
 	}
 	var p ReviewPlan
 	err := WithTransaction(root, reviewScope(nil, true), func(tx *Transaction) error {
@@ -46,7 +49,7 @@ func ExtendReviewPlan(root string, x ReviewPlanExtension) error {
 		if err != nil {
 			return err
 		}
-		if !ok || p.Sealed && len(x.RebindCycles) == 0 || p.Revision != x.ExpectedRevision {
+		if !ok || p.Sealed && len(x.RebindCycles) == 0 && !x.SyncTargets || p.Revision != x.ExpectedRevision {
 			return reviewError("plan extension CAS/sealed conflict")
 		}
 		if err = verifyPlanCopiesFor(tx, p, len(x.RebindCycles) == 0); err != nil {
@@ -115,6 +118,27 @@ func ExtendReviewPlan(root string, x ReviewPlanExtension) error {
 			}
 			p.Batches = append(p.Batches, b)
 		}
+		if x.SyncTargets {
+			batches, synced := slices.Clone(p.Batches), false
+			for i, pb := range batches {
+				var b ReviewBatch
+				ok, e := readReviewJSON(tx, reviewBatchName(pb.BatchID), &b)
+				if e != nil {
+					return e
+				}
+				if !ok {
+					return reviewError("planned batch missing")
+				}
+				if pb.TargetCommit != b.TargetCommit {
+					batches[i].TargetCommit = b.TargetCommit
+					synced = true
+				}
+			}
+			if !synced {
+				return reviewError("no planned batch target differs from its runtime batch")
+			}
+			p.Batches = batches
+		}
 		if x.Seal {
 			for _, id := range p.TaskIDs {
 				found := false
@@ -130,21 +154,9 @@ func ExtendReviewPlan(root string, x ReviewPlanExtension) error {
 			p.Sealed = true
 		}
 		p.Revision++
-		for _, id := range p.TaskIDs {
-			if err = tx.PutGroup(reviewControlGroup, "tracked-cycles/"+id+".json", reviewJSON(map[string]string{"cycle": p.Cycles[id]})); err != nil {
-				return err
-			}
-			if err = tx.Put(id, "reviews/plan.json", reviewJSON(p)); err != nil {
-				return err
-			}
-		}
-		if err = tx.PutGroup(reviewControlGroup, fmt.Sprintf("plan-history/%s/%d.json", p.PlanID, p.Revision), reviewJSON(struct {
-			Previous   ReviewPlan          `json:"previous"`
-			Request    ReviewPlanExtension `json:"request"`
-			RecordedAt string              `json:"recorded_at"`
-		}{previous, x, time.Now().UTC().Format(time.RFC3339Nano)})); err != nil {
+		if err = putPlanHistory(tx, p, previous, x); err != nil {
 			return err
 		}
-		return tx.PutGroup(reviewControlGroup, planName(p.PlanID), reviewJSON(p))
+		return putPlanCopies(tx, p)
 	})
 }
