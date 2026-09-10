@@ -71,6 +71,7 @@ func TestOverlaySetAndDeletePruneEmptyParents(t *testing.T) {
 }
 
 func TestResolveOverlayLocationGitWorktreeAndNonGit(t *testing.T) {
+	overlayLookup(t)
 	setupHome(t)
 	root := t.TempDir()
 	main := initGitRepo(t, filepath.Join(root, "repo"))

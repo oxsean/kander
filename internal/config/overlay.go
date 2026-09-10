@@ -12,6 +12,11 @@ import (
 
 const OverlayFilename = ".kander-config.json"
 
+// OverlayDisabled reports the opt-out that every project-overlay lookup honours.
+// Fixtures run from inside a checkout, where a lookup would otherwise reach the
+// developer's own overlay and merge it into the fixture's scope configuration.
+func OverlayDisabled() bool { return os.Getenv(EnvNoOverlay) != "" }
+
 var overlayForbiddenKeys = map[string]struct{}{
 	"schema_version":   {},
 	"welcome_complete": {},
@@ -156,9 +161,7 @@ func walkOverlay(start string) (string, error) {
 // OverlayPath returns the absolute project overlay path for cwd, or "" when none exists.
 // A Git directory uses the main worktree root; otherwise the search walks up from cwd.
 func OverlayPath(cwd string) (string, error) {
-	// Fixtures run from inside a checkout, where the lookup would otherwise reach
-	// the developer's own overlay and merge it into the fixture's scope config.
-	if os.Getenv(EnvNoOverlay) != "" {
+	if OverlayDisabled() {
 		return "", nil
 	}
 	if cwd == "" {

@@ -515,6 +515,11 @@ func TestNoOverlayEnvSkipsLookupAndMerge(t *testing.T) {
 	if err != nil || got != "" {
 		t.Fatalf("lookup still reached the overlay: %q %v", got, err)
 	}
+	// Options resolves its own location, so the switch has to reach that path too.
+	loc, err := ResolveOverlayLocation("")
+	if err != nil || loc != (OverlayLocation{}) {
+		t.Fatalf("Options location still reached the overlay: %+v %v", loc, err)
+	}
 	cfg, err := Load(true)
 	if err != nil {
 		t.Fatal(err)

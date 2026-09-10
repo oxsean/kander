@@ -130,6 +130,9 @@ func overlayJSONValue(value any) any {
 // Git uses the main worktree; a missing file still names that path. Non-Git reuses
 // walk-up when a file exists, otherwise the start directory is the create target.
 func ResolveOverlayLocation(cwd string) (OverlayLocation, error) {
+	if OverlayDisabled() {
+		return OverlayLocation{}, nil
+	}
 	if cwd == "" {
 		var err error
 		cwd, err = os.Getwd()
