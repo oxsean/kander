@@ -37,9 +37,14 @@ func initGitDir(t *testing.T, dir string) {
 	}
 }
 
-func writeOverlayFile(t *testing.T, dir string, payload map[string]any) (string, []byte) {
+// writeOverlayFile creates an overlay the test intends to be found, so it also
+// re-enables the lookup in this process and in the harness environment the
+// kander subprocesses inherit, which newHarness already snapshotted.
+func writeOverlayFile(h *harness, dir string, payload map[string]any) (string, []byte) {
+	t := h.t
 	t.Helper()
 	t.Setenv(config.EnvNoOverlay, "")
+	h.unsetenv(config.EnvNoOverlay)
 	path := filepath.Join(dir, config.OverlayFilename)
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -61,7 +66,7 @@ func TestDoctorReloadsMergedAgentsAfterCreatingMissingConfig(t *testing.T) {
 	}
 	repo := filepath.Join(h.root, "project")
 	initGitDir(t, repo)
-	writeOverlayFile(t, repo, map[string]any{
+	writeOverlayFile(h, repo, map[string]any{
 		"agents": map[string]any{"codex": map[string]any{"path": wrapper}},
 	})
 	code, _, errOut := h.runIn(repo, "doctor")
@@ -75,7 +80,7 @@ func TestConfigJSONMergesOverlayAndHumanPrintsPath(t *testing.T) {
 	h.writeConfig(defaultPayload(map[string]any{"kanban_agent": "codex", "language": "cn"}))
 	repo := filepath.Join(h.root, "project")
 	initGitDir(t, repo)
-	overlay, _ := writeOverlayFile(t, repo, map[string]any{"kanban_agent": "claude"})
+	overlay, _ := writeOverlayFile(h, repo, map[string]any{"kanban_agent": "claude"})
 
 	code, out, errOut := h.runIn(repo, "config", "--json")
 	if code != 0 {
@@ -103,7 +108,7 @@ func TestConfigUsesOverlayLanguage(t *testing.T) {
 	h.writeConfig(defaultPayload(map[string]any{"kanban_agent": "codex", "language": "en"}))
 	repo := filepath.Join(h.root, "project")
 	initGitDir(t, repo)
-	writeOverlayFile(t, repo, map[string]any{"language": "ja"})
+	writeOverlayFile(h, repo, map[string]any{"language": "ja"})
 
 	code, out, errOut := h.runIn(repo, "config", "--json")
 	if code != 0 {
@@ -136,7 +141,7 @@ func TestSessionSaveLeavesOverlayLanguageIsolated(t *testing.T) {
 	h.writeConfig(defaultPayload(map[string]any{"kanban_agent": "codex", "language": "en"}))
 	repo := filepath.Join(h.root, "project")
 	initGitDir(t, repo)
-	overlay, original := writeOverlayFile(t, repo, map[string]any{"language": "ja"})
+	overlay, original := writeOverlayFile(h, repo, map[string]any{"language": "ja"})
 	t.Chdir(repo)
 	t.Setenv("PATH", h.fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
@@ -194,7 +199,7 @@ func TestSessionSaveLeavesOverlayLanguageIsolatedWhenScopeOmitsKey(t *testing.T)
 	h.writeConfig(defaultPayload(map[string]any{"kanban_agent": "codex"}))
 	repo := filepath.Join(h.root, "project")
 	initGitDir(t, repo)
-	overlay, original := writeOverlayFile(t, repo, map[string]any{"language": "ja"})
+	overlay, original := writeOverlayFile(h, repo, map[string]any{"language": "ja"})
 	t.Chdir(repo)
 	t.Setenv("PATH", h.fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	config.BindEffectiveLanguage()
@@ -249,7 +254,7 @@ func TestDoctorRepairDoesNotWriteOverlayValues(t *testing.T) {
 	}))
 	repo := filepath.Join(h.root, "project")
 	initGitDir(t, repo)
-	overlay, original := writeOverlayFile(t, repo, map[string]any{"kanban_agent": "cursor", "language": "ja"})
+	overlay, original := writeOverlayFile(h, repo, map[string]any{"kanban_agent": "cursor", "language": "ja"})
 
 	_, _, _ = h.runIn(repo, "doctor")
 	data, err := os.ReadFile(overlay)
